@@ -7,7 +7,7 @@ const auth = require('../middleware/auth');
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, status } = req.body;
 
     // Validate input
     if (!email || !password || !name) {
@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
       email,
       password,
       name,
-      status: 'pending' // Requires admin approval
+      status: status // Requires admin approval
     });
 
     await user.save();
