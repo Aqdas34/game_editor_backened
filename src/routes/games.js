@@ -205,7 +205,29 @@ router.delete('/:id', [auth, admin], async (req, res) => {
       return res.status(404).json({ message: 'Game not found' });
     }
 
-    await game.remove();
+    // Delete associated files
+    if (game.thumbnail) {
+      const thumbnailPath = path.join(uploadsDir, game.thumbnail);
+      try {
+        await fs.promises.unlink(thumbnailPath);
+      } catch (err) {
+        console.error('Error deleting thumbnail:', err);
+      }
+    }
+
+    if (game.images && game.images.length > 0) {
+      for (const image of game.images) {
+        const imagePath = path.join(uploadsDir, image);
+        try {
+          await fs.promises.unlink(imagePath);
+        } catch (err) {
+          console.error('Error deleting image:', err);
+        }
+      }
+    }
+
+    // Delete the game document
+    await Game.deleteOne({ _id: req.params.id });
     res.json({ message: 'Game removed' });
   } catch (error) {
     console.error(error);
