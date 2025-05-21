@@ -270,4 +270,71 @@ router.post('/save-edited-image', [auth, upload.single('image')], async (req, re
   }
 });
 
+const ensureDirSync = (dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
+// Duplicate game images for user
+router.post('/:gameId/duplicate-for-user', auth, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const game = await Game.findById(req.params.gameId);
+    if (!game) return res.status(404).json({ message: 'Game not found' });
+    const userDir = path.join(uploadsDir, 'users', userId, req.params.gameId);
+    ensureDirSync(userDir);
+    // Copy each image if not already present
+    for (const img of game.images) {
+      const src = path.join(uploadsDir, img);
+      const dest = path.join(userDir, img);
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+      }
+    }
+    res.json({ message: 'Images duplicated for user' });
+  } catch (error) {
+    console.error('Error duplicating images for user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user's game images
+router.get('/:gameId/user-images/:userId', auth, async (req, res) => {
+  try {
+    const game = await Game.findById(req.params.gameId);
+    if (!game) return res.status(404).json({ message: 'Game not found' });
+    const userDir = path.join(uploadsDir, 'users', req.params.userId, req.params.gameId);
+    ensureDirSync(userDir);
+    // Only return images that exist in the user folder
+    const images = game.images.filter(img => fs.existsSync(path.join(userDir, img)));
+    res.json({ name: game.name, ageGroup: game.ageGroup, sku: game.sku, images });
+  } catch (error) {
+    console.error('Error getting user images:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Save edited image for user
+router.post('/save-edited-image-for-user', [auth, upload.single('image')], async (req, res) => {
+  try {
+    const { userId, gameId, pageIndex } = req.body;
+    if (!req.file) return res.status(400).json({ message: 'No image file provided' });
+    const game = await Game.findById(gameId);
+    if (!game) return res.status(404).json({ message: 'Game not found' });
+    const userDir = path.join(uploadsDir, 'users', userId, gameId);
+    ensureDirSync(userDir);
+    const imgName = game.images[pageIndex];
+    const dest = path.join(userDir, imgName);
+    // Overwrite the user's image
+    fs.copyFileSync(req.file.path, dest);
+    // Remove the temp upload
+    fs.unlinkSync(req.file.path);
+    res.json({ message: 'Image saved for user' });
+  } catch (error) {
+    console.error('Error saving edited image for user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router; 
