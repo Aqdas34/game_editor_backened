@@ -106,4 +106,56 @@ router.delete('/:id', [auth, admin], async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Get user profile
+router.get('/profile', auth, async (req, res) => {
+  try {
+    console.log('Fetching profile for user ID:', req.user.userId);
+    
+    const user = await User.findById(req.user.userId)
+      .select('-password')
+      .populate('purchasedGames', 'name thumbnail');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log('User profile fetched:', {
+      id: user._id,
+      name: user.name,
+      purchasedGamesCount: user.purchasedGames ? user.purchasedGames.length : 0
+    });
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get current user profile
+router.get('/current', auth, async (req, res) => {
+  try {
+    console.log('Fetching current user profile for ID:', req.user.userId);
+    
+    const user = await User.findById(req.user.userId)
+      .select('-password')
+      .populate('purchasedGames', 'name thumbnail');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log('User profile fetched:', {
+      id: user._id,
+      name: user.name,
+      purchasedGamesCount: user.purchasedGames ? user.purchasedGames.length : 0
+    });
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+module.exports = router;

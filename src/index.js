@@ -8,12 +8,19 @@ const app = express();
 
 // Middleware
 app.use(cors());
+
+// Special handling for Stripe webhooks - must come before express.json()
+// app.use('/api/webhooks/stripe', express.raw({type: 'application/json'}));
+
+app.use('/api/webhooks', require('./routes/webhooks'));
+
+// JSON middleware for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://admin:W2RLcnOdGHz1CNux@SG-amused-amount-9327-73686.servers.mongodirector.com:27017/admin', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
@@ -25,6 +32,11 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/games', require('./routes/games'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/payments', require('./routes/payments'));
+
+// Webhook route needs raw body for signature verification
+// This must come after JSON middleware but before webhook routes
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

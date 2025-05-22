@@ -6,6 +6,7 @@ const fs = require('fs');
 const Game = require('../models/Game');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
+const User = require('../models/User');
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -333,6 +334,32 @@ router.post('/save-edited-image-for-user', [auth, upload.single('image')], async
     res.json({ message: 'Image saved for user' });
   } catch (error) {
     console.error('Error saving edited image for user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Check if user owns a specific game
+router.get('/:id/check-ownership', auth, async (req, res) => {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+    
+    console.log(`Checking if user ${userId} owns game ${gameId}`);
+    
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if the game is in the user's purchased games
+    const owned = user.purchasedGames.some(id => id.toString() === gameId);
+    
+    console.log(`Game ownership result: ${owned ? 'Owned' : 'Not owned'}`);
+    
+    res.json({ owned });
+  } catch (error) {
+    console.error('Error checking game ownership:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

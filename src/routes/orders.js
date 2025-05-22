@@ -104,14 +104,26 @@ router.post('/:id/confirm', auth, async (req, res) => {
 
 // Get user orders
 router.get('/my-orders', auth, async (req, res) => {
+  console.log('✅ Fetching orders for user:', req.user.userId);
+  
   try {
     const orders = await Order.find({ user: req.user.userId })
-      .populate('game', 'name thumbnail')
+      .populate('game', 'name thumbnail author')
       .sort('-createdAt');
+    
+    console.log(`✅ Found ${orders.length} orders for user ${req.user.userId}`);
+    
+    // Add debug info
+    if (orders.length === 0) {
+      console.log('⚠️ No orders found. Checking if user has any orders in the database...');
+      const totalOrders = await Order.countDocuments({});
+      console.log(`📊 Total orders in database: ${totalOrders}`);
+    }
+    
     res.json(orders);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Error fetching user orders:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

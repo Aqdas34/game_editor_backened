@@ -82,6 +82,8 @@ router.post('/login', async (req, res) => {
     }
 
     // Verify password
+    console.log('Password:', password);
+    console.log('User:', user);
     const isMatch = await user.comparePassword(password);
     console.log('Password match:', isMatch ? 'Yes' : 'No');
     
