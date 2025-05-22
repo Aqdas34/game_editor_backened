@@ -15,7 +15,7 @@ router.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req,
       event = stripe.webhooks.constructEvent(
         req.body,  // raw buffer
         sig,
-        process.env.STRIPE_WEBHOOK_SECRET
+        'whsec_bd754d55e2840c10344e79b2ccb117a66a5abd2b78ec20e50b268720ace7201b'
       );
       console.log(`✅ Webhook received: ${event.type}`);
     } catch (err) {
