@@ -7,6 +7,7 @@ const Game = require('../models/Game');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 const User = require('../models/User');
+const fsExtra = require('fs-extra');
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -236,37 +237,35 @@ router.delete('/:id', [auth, admin], async (req, res) => {
   }
 });
 
-// Save edited image
-router.post('/save-edited-image', [auth, upload.single('image')], async (req, res) => {
+// Get game images for admin
+router.get('/:id/admin-images', [auth, admin], async (req, res) => {
+  try {
+    const game = await Game.findById(req.params.id);
+    if (!game) return res.status(404).json({ message: 'Game not found' });
+    const images = game.images.map(img => path.join(uploadsDir, img));
+    res.json({ name: game.name, ageGroup: game.ageGroup, sku: game.sku, images });
+  } catch (error) {
+    console.error('Error fetching admin game images:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Modify save edited image route to handle admin
+router.post('/save-edited-image', [auth, admin], upload.single('image'), async (req, res) => {
   try {
     const { gameId, pageIndex } = req.body;
-    
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image file provided' });
-    }
-
+    if (!req.file) return res.status(400).json({ message: 'No image file provided' });
     const game = await Game.findById(gameId);
-    if (!game) {
-      return res.status(404).json({ message: 'Game not found' });
-    }
-
-    // Delete the old image if it exists
-    if (game.images[pageIndex]) {
-      const oldImagePath = path.join(uploadsDir, game.images[pageIndex]);
-      try {
-        await fs.promises.unlink(oldImagePath);
-      } catch (err) {
-        console.error('Error deleting old image:', err);
-      }
-    }
-
-    // Update the image in the game document
-    game.images[pageIndex] = req.file.filename;
-    await game.save();
-
-    res.json(game);
+    if (!game) return res.status(404).json({ message: 'Game not found' });
+    const imgName = game.images[pageIndex];
+    const dest = path.join(uploadsDir, imgName);
+    // Overwrite the image
+    fs.copyFileSync(req.file.path, dest);
+    // Remove the temp upload
+    fs.unlinkSync(req.file.path);
+    res.json({ message: 'Image saved' });
   } catch (error) {
-    console.error('Error saving edited image:', error);
+    console.error('Error saving edited image for admin:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -278,7 +277,7 @@ const ensureDirSync = (dir) => {
 };
 
 // Duplicate game images for user
-router.post('/:gameId/duplicate-for-user', auth, async (req, res) => {
+router.post('/:gameId/duplicate-for-user', async (req, res) => {
   try {
     const { userId } = req.body;
     const game = await Game.findById(req.params.gameId);
@@ -301,7 +300,7 @@ router.post('/:gameId/duplicate-for-user', auth, async (req, res) => {
 });
 
 // Get user's game images
-router.get('/:gameId/user-images/:userId', auth, async (req, res) => {
+router.get('/:gameId/user-images/:userId',  async (req, res) => {
   try {
     const game = await Game.findById(req.params.gameId);
     if (!game) return res.status(404).json({ message: 'Game not found' });
@@ -317,7 +316,7 @@ router.get('/:gameId/user-images/:userId', auth, async (req, res) => {
 });
 
 // Save edited image for user
-router.post('/save-edited-image-for-user', [auth, upload.single('image')], async (req, res) => {
+router.post('/save-edited-image-for-user', upload.single('image'), async (req, res) => {
   try {
     const { userId, gameId, pageIndex } = req.body;
     if (!req.file) return res.status(400).json({ message: 'No image file provided' });
@@ -339,7 +338,7 @@ router.post('/save-edited-image-for-user', [auth, upload.single('image')], async
 });
 
 // Check if user owns a specific game
-router.get('/:id/check-ownership', auth, async (req, res) => {
+router.get('/:id/check-ownership',  async (req, res) => {
   try {
     const gameId = req.params.id;
     const userId = req.user.userId;
@@ -360,6 +359,34 @@ router.get('/:id/check-ownership', auth, async (req, res) => {
     res.json({ owned });
   } catch (error) {
     console.error('Error checking game ownership:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Copy user's game folder from guest to actual user ID
+router.post('/rename-folder', async (req, res) => {
+  try {
+    const { oldName, newName } = req.body;
+    const oldPath = path.join(uploadsDir, 'users', oldName);
+    const newPath = path.join(uploadsDir, 'users', newName);
+
+    if (!fs.existsSync(oldPath)) {
+      return res.status(404).json({ message: 'Old folder not found' });
+    }
+
+    if (fs.existsSync(newPath)) {
+      return res.status(400).json({ message: 'New folder already exists' });
+    }
+
+    // Copy files from oldPath to newPath
+    await fsExtra.copy(oldPath, newPath);
+
+    // Delete old directory and its contents
+    await fsExtra.remove(oldPath);
+
+    res.json({ message: 'Folder copied and old folder deleted successfully' });
+  } catch (error) {
+    console.error('Error copying folder:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
